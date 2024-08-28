@@ -49,6 +49,14 @@
   (let ((json-array-type 'list))
     (apply #'json-read r)))
 
+(defun inv/id-at-point ()
+  (let ((url (thing-at-point 'url)))
+    (if url
+      (if (string-match "watch\\?v=\\(.*\\)" url)
+          (match-string 1 url)
+        nil)
+      nil)))
+
 (defun inv/clear-thumbnail-cache ()
   (interactive)
   (setq inv//thumb-cache nil))
