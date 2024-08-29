@@ -39,7 +39,7 @@
 (require 'json)
 (require 'url)
 
-(defvar inv/default-instances '("iv.ggtyler.dev" "inv.nadeko.net" "invidious.nerdvpn.de" "invidious.jing.rocks" "iv.nboeck.de" "invidious.perennialte.ch" "invidious.reallyaweso.me" "yewtu.be" "invidious.privacyredirect.com" "invidious.einfachzocken.eu"))
+(defvar inv/instances '("iv.ggtyler.dev" "inv.nadeko.net" "invidious.nerdvpn.de" "invidious.jing.rocks" "iv.nboeck.de" "invidious.perennialte.ch" "invidious.reallyaweso.me" "yewtu.be" "invidious.privacyredirect.com" "invidious.einfachzocken.eu"))
 (defvar inv/thumbnail-quality 'sddefault "the thumbnail returned by `inv/fetch-thumbnail-url': one of maxres, sddefault, high, medium, default, start, middle, end.")
 (defvar inv/search-buffer-name "*Invidious search results*")
 
@@ -48,6 +48,12 @@
 (defun inv//json-read-l (&rest r)
   (let ((json-array-type 'list))
     (apply #'json-read r)))
+
+(defun inv//shuf (seq)
+  (let ((n (length seq)))
+    (prog1 seq
+      (dotimes (i n)
+        (cl-rotatef (elt seq i) (elt seq (+ i (cl-random (- n i)))))))))
 
 (defun inv/id-at-point ()
   (let ((url (thing-at-point 'url)))
@@ -88,7 +94,8 @@
                                    (if (null (assoc 'error data))
                                        (funcall cb data)
                                      (funcall f (cdr l)))))))))))
-    (funcall f inv/default-instances))
+    (let ((l (inv//shuf (-copy inv/instances))))
+      (funcall f l)))
   t)
 
 (defun inv/search (q cb)
@@ -123,20 +130,23 @@
   "Call CB with the image thumbnail associated with the video of id ID. This funcion caches images in `inv//thumb-cache'. If url provided, use it instead of fetching it by video id."
   (let ((c (assoc id-or-url inv//thumb-cache #'string=)))
     (if c
-        (funcall cb (create-image (cdr c) 'jpeg t)) ;; we already have that in the cache
-      (inv/fetch-thumbnail-url
-       id-or-url
-       (lambda (url)
-         (request url
-           :encoding 'binary
-           :error (cl-function
-                   (lambda (&key data &allow-other-keys)
-                     (funcall cb nil)))
-           :complete (cl-function
-                      (lambda (&key data &allow-other-keys)
-                        (let ((data (string-as-unibyte data)))
-                          (setq inv//thumb-cache (append inv//thumb-cache (list (cons id-or-url data))))
-                          (funcall cb (create-image data 'jpeg t)))))))))))
+        (funcall cb (cdr c))
+      (let ((i (create-image nil 'jpeg t)))
+        (setq inv//thumb-cache (append inv//thumb-cache (list (cons id-or-url i))))
+        (funcall cb i)
+        (inv/fetch-thumbnail-url
+         id-or-url
+         (lambda (url)
+           (request url
+             :encoding 'binary
+             :error (cl-function
+                     (lambda (&key data &allow-other-keys)
+                       (funcall cb nil)))
+             :complete (cl-function
+                        (lambda (&key data &allow-other-keys)
+                          (let* ((data (string-as-unibyte data)))
+                            (image--set-property i :data data)
+                            (image-refresh i)))))))))))
 
 (defun inv/popup-thumbnail (id)
   (let ((buf (get-buffer-create "*Thumbnail preview*")))
@@ -157,7 +167,9 @@
   (let ((buf (get-buffer-create inv/search-buffer-name)))
     (letrec ((f (lambda (l)
                   (cond
-                   ((null l) (switch-to-buffer inv/search-buffer-name))
+                   ((null l)
+                    (switch-to-buffer inv/search-buffer-name)
+                    (goto-char (point-min)))
                    (t
                     (let* ((r (car l))
                            (type (cdr (assoc 'type r))))
