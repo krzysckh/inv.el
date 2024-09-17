@@ -204,5 +204,13 @@
         (erase-buffer))
       (funcall f data))))
 
+;; does not call an invidious instance, but a nice thing to have
+(defun inv/dislikes (id cb)
+  (request (concat "https://returnyoutubedislikeapi.com/votes?videoId=" id)
+    :parser #'inv//json-read-l
+    :success (cl-function
+              (lambda (&key data &allow-other-keys)
+                (funcall cb data))))
+  t)
 
 (provide 'inv)
