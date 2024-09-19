@@ -57,10 +57,8 @@
 
 (defun inv/videop (url)
   "check if `url' is a video, if so return the id, elsewise nil"
-  (if (string-match "watch\\?v=\\(.*\\)" (or url nil))
-      (let ((v (match-string 1 url)))
-        (message "videop ret: %s" v)
-        v)
+  (if (string-match "watch\\?v=\\(.*\\)" (or url ""))
+      (match-string 1 url)
     nil))
 
 (defun inv/id-at-point ()
@@ -200,6 +198,12 @@
                                (insert title)
                                (insert "    ")
                                (insert author)
+                               (insert "  ")
+                               (insert-button
+                                "Copy URL"
+                                'face 'button
+                                'follow-link t
+                                'action (lambda (_) (kill-new (concat "https://youtube.com/watch?v=" id))))
                                (insert "\n")
                                (funcall f (cdr l)))))))
                        (t
