@@ -42,6 +42,8 @@
 (defvar inv/instances '("iv.ggtyler.dev" "inv.nadeko.net" "invidious.nerdvpn.de" "invidious.jing.rocks" "iv.nboeck.de" "invidious.perennialte.ch" "invidious.reallyaweso.me" "yewtu.be" "invidious.privacyredirect.com" "invidious.einfachzocken.eu"))
 (defvar inv/thumbnail-quality 'sddefault "the thumbnail returned by `inv/fetch-thumbnail-url': one of maxres, sddefault, high, medium, default, start, middle, end.")
 (defvar inv/search-buffer-name "*Invidious search results*")
+(defvar inv/chanlist-buffer-name "*Invidious channel search results*")
+(defvar inv/chan-buffer-name "*Invidious channel videos*")
 
 (defvar inv//thumb-cache nil)
 
@@ -105,6 +107,16 @@
    (list (read-string "Enter query: ") #'inv/display-search-results))
   (inv/json-request (concat "/api/v1/search?q=" (url-encode-url q)) cb))
 
+(defun inv/search-channel (id cb)
+  (interactive
+   (list (read-string "Enter query: ") #'inv/display-channels))
+  (inv/json-request (concat "/api/v1/search?type=channel&q=" (url-encode-url id)) cb))
+
+(defun inv/channel (id cb)
+  (interactive
+   (list (read-string "Enter chan id: ") #'inv/display-channel))
+  (inv/json-request (concat "/api/v1/channels/" (url-encode-url id) "/videos") cb))
+
 (defun inv/fetch-video-data (id cb)
   (inv/json-request (concat "/api/v1/videos/" id) cb))
 
@@ -166,11 +178,58 @@
              (quit-window t)))))))
 
 (defun inv/display-search-results (data)
-  (let ((buf (get-buffer-create inv/search-buffer-name)))
+  (inv//display-data data inv/search-buffer-name))
+
+(defun inv/display-channel (data)
+  (inv//display-data (cdr (assoc 'videos data)) inv/chan-buffer-name))
+
+;; TODO: maybe this should be combined with inv/display-data
+(defun inv/display-channels (data)
+  (let ((buf (get-buffer-create inv/chanlist-buffer-name)))
     (letrec ((f (lambda (l)
                   (cond
                    ((null l)
-                    (switch-to-buffer inv/search-buffer-name)
+                    (switch-to-buffer buf)
+                    (goto-char (point-min)))
+                   (t
+                    (let* ((r (car l))
+                           (type (cdr (assoc 'type r))))
+                      (cond
+                       ((string= type "channel")
+                        (let ((id (cdr (assoc 'authorId r)))
+                              (author (cdr (assoc 'author r)))
+                              (author-url (cdr (assoc 'authorUrl r))))
+                          (with-current-buffer buf
+                            (insert-button
+                             "Open"
+                             'face 'button
+                             'follow-link t
+                             'action (lambda (_) (inv/channel id #'inv/display-channel)))
+                            ;; (insert "  ")
+                            ;; (insert-image img)
+                            (insert "  ")
+                            ;; (put-text-property 0 (length title) 'face 'warning title)
+                            (insert author)
+                            (insert "  ")
+                            (insert-button
+                             "Copy URL"
+                             'face 'button
+                             'follow-link t
+                             'action (lambda (_) (kill-new author-url)))
+                            (insert "\n")
+                            (funcall f (cdr l)))))
+                       (t
+                        (funcall f (cdr l))))))))))
+      (with-current-buffer buf
+        (erase-buffer))
+      (funcall f data))))
+
+(defun inv//display-data (data bufn)
+  (let ((buf (get-buffer-create bufn)))
+    (letrec ((f (lambda (l)
+                  (cond
+                   ((null l)
+                    (switch-to-buffer bufn)
                     (goto-char (point-min)))
                    (t
                     (let* ((r (car l))
@@ -180,6 +239,7 @@
                         (let ((title (cdr (assoc 'title r)))
                               (id (cdr (assoc 'videoId r)))
                               (author (cdr (assoc 'author r)))
+                              (author-id (cdr (assoc 'authorId r)))
                               (thumbnail-url (cdr (assoc 'url (cdr (assoc 'default (inv/parse-thumbnails r))))))
                               (views (cdr (assoc 'viewCountText r))))
                           (inv/thumbnail-to-image
@@ -197,7 +257,11 @@
                                (put-text-property 0 (length title) 'face 'warning title)
                                (insert title)
                                (insert "    ")
-                               (insert author)
+                               (insert-button
+                                author
+                                'face 'button
+                                'follow-link t
+                                'action (lambda (_) (inv/channel author-id #'inv/display-channel)))
                                (insert "  ")
                                (insert-button
                                 "Copy URL"
