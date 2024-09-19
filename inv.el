@@ -55,13 +55,17 @@
       (dotimes (i n)
         (cl-rotatef (elt seq i) (elt seq (+ i (cl-random (- n i)))))))))
 
+(defun inv/videop (url)
+  "check if `url' is a video, if so return the id, elsewise nil"
+  (if (string-match "watch\\?v=\\(.*\\)" (or url nil))
+      (let ((v (match-string 1 url)))
+        (message "videop ret: %s" v)
+        v)
+    nil))
+
 (defun inv/id-at-point ()
   (let ((url (thing-at-point 'url)))
-    (if url
-      (if (string-match "watch\\?v=\\(.*\\)" url)
-          (match-string 1 url)
-        nil)
-      nil)))
+    (inv/videop url)))
 
 (defun inv/clear-thumbnail-cache ()
   (interactive)
