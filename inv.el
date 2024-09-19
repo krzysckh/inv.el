@@ -72,6 +72,7 @@
   (setq inv//thumb-cache nil))
 
 (defun inv/get-instances (cb)
+  "call `cb' with a list of invidious instances."
   (request "https://api.invidious.io/instances.json"
     :parser #'inv//json-read-l
     :complete (cl-function (lambda (&key data &allow-other-keys)
@@ -79,9 +80,11 @@
   t)
 
 (defun inv/get-clearnet-instances (cb)
+  "call `cb' with a list of clearnet invidious instances."
   (inv/get-instances (lambda (l) (funcall cb (--filter (not (string-match "onion\\|i2p" it)) l)))))
 
 (defun inv/json-request (to cb &rest opts)
+  "invoke a request `to' to an invidious instance from `inv/instances'. if it fails, try another. call `cb' with the result."
   (letrec ((f (lambda (l)
                 (message "inv/json-request: trying %s..." (car l))
                 (if (null l)
@@ -102,17 +105,33 @@
       (funcall f l)))
   t)
 
+(defun inv/load-instances ()
+  "download and invidious instances and set `inv/instances' to the result."
+  (interactive)
+  (inv/get-clearnet-instances
+   #'(lambda (l)
+       (setq inv/instances l)
+       (message "set inv/instances to %s" l))))
+
 (defun inv/search (q cb)
+  "search for `q' on one of `inv/instances'. call `cb' with the
+result. if called interactivaly, `cb' defaults to
+`inv/display-search-results'"
   (interactive
    (list (read-string "Enter query: ") #'inv/display-search-results))
   (inv/json-request (concat "/api/v1/search?q=" (url-encode-url q)) cb))
 
-(defun inv/search-channel (id cb)
+(defun inv/search-channel (q cb)
+  "search for channel `q' on one of `inv/instances'. call `cb with the
+result. if called interactively, `cb' defaults to
+`inv/display-channels'."
   (interactive
    (list (read-string "Enter query: ") #'inv/display-channels))
-  (inv/json-request (concat "/api/v1/search?type=channel&q=" (url-encode-url id)) cb))
+  (inv/json-request (concat "/api/v1/search?type=channel&q=" (url-encode-url q)) cb))
 
 (defun inv/channel (id cb)
+  "get videos of channel with id `id', pass them to `cb', when called
+interactively, `cb' defaults to `inv/display-channel'"
   (interactive
    (list (read-string "Enter chan id: ") #'inv/display-channel))
   (inv/json-request (concat "/api/v1/channels/" (url-encode-url id) "/videos") cb))
@@ -141,7 +160,7 @@
     (inv/fetch-thumbnail-urls id (lambda (l) (funcall cb (cdr (assoc 'url (cdr (assoc inv/thumbnail-quality l)))))))))
 
 (defun inv/thumbnail-to-image (id-or-url cb)
-  "Call CB with the image thumbnail associated with the video of id ID. This funcion caches images in `inv//thumb-cache'. If url provided, use it instead of fetching it by video id."
+  "Call `cb' with the image thumbnail associated with the video of id `id-or-url'. This funcion caches images in `inv//thumb-cache'. If url provided, use it instead of fetching it by video id."
   (let ((c (assoc id-or-url inv//thumb-cache #'string=)))
     (if c
         (funcall cb (cdr c))
@@ -278,6 +297,7 @@
 
 ;; does not call an invidious instance, but a nice thing to have
 (defun inv/dislikes (id cb)
+  "ask the return youtube dislike api for stats on video with id `id', pass that data to `cb'"
   (request (concat "https://returnyoutubedislikeapi.com/votes?videoId=" id)
     :parser #'inv//json-read-l
     :success (cl-function
