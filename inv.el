@@ -40,6 +40,7 @@
 (require 'url)
 
 (defvar inv/instances '("iv.ggtyler.dev" "inv.nadeko.net" "invidious.nerdvpn.de" "invidious.jing.rocks" "iv.nboeck.de" "invidious.perennialte.ch" "invidious.reallyaweso.me" "yewtu.be" "invidious.privacyredirect.com" "invidious.einfachzocken.eu"))
+(defvar inv/request-timeout 3 "timeout for a `inv/json-request' (in seconds)")
 (defvar inv/thumbnail-quality 'sddefault "the thumbnail returned by `inv/fetch-thumbnail-url': one of maxres, sddefault, high, medium, default, start, middle, end.")
 (defvar inv/search-buffer-name "*Invidious search results*")
 (defvar inv/chanlist-buffer-name "*Invidious channel search results*")
@@ -91,6 +92,7 @@
                     (funcall cb 'oops)
                   (let* ((url (concat "https://" (car l) to)))
                     (request url
+                      :timeout inv/request-timeout
                       :data opts
                       :parser #'inv//json-read-l
                       :error (cl-function
