@@ -126,7 +126,7 @@ result. if called interactivaly, `cb' defaults to
 result. if called interactively, `cb' defaults to
 `inv/display-channels'."
   (interactive
-   (list (read-string "Enter query: ") #'inv/display-channels))
+   (list (read-string "Enter query (chan): ") #'inv/display-channels))
   (inv/json-request (concat "/api/v1/search?type=channel&q=" (url-encode-url q)) cb))
 
 (defun inv/channel (id cb)
