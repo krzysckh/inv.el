@@ -45,6 +45,7 @@
 (defvar inv/search-buffer-name "*Invidious search results*")
 (defvar inv/chanlist-buffer-name "*Invidious channel search results*")
 (defvar inv/chan-buffer-name "*Invidious channel videos*")
+(defvar inv/viddesc-buffer-name "*Invidious video description*")
 
 (defvar inv//thumb-cache nil)
 
@@ -228,10 +229,10 @@ interactively, `cb' defaults to `inv/display-channel'"
                              'action (lambda (_) (inv/channel id #'inv/display-channel)))
                             ;; (insert "  ")
                             ;; (insert-image img)
-                            (insert "  ")
+                            (insert " ")
                             ;; (put-text-property 0 (length title) 'face 'warning title)
                             (insert author)
-                            (insert "  ")
+                            (insert " ")
                             (insert-button
                              "Copy URL"
                              'face 'button
@@ -272,23 +273,38 @@ interactively, `cb' defaults to `inv/display-channel'"
                                 'face 'button
                                 'follow-link t
                                 'action (lambda (_) (browse-url (concat "https://youtube.com/watch?v=" id))))
-                               (insert "  ")
+                               (insert " ")
                                (insert-image img)
-                               (insert "  ")
+                               (insert " ")
                                (put-text-property 0 (length title) 'face 'warning title)
                                (insert title)
-                               (insert "    ")
+                               (insert " ")
                                (insert-button
                                 author
                                 'face 'button
                                 'follow-link t
                                 'action (lambda (_) (inv/channel author-id #'inv/display-channel)))
-                               (insert "  ")
+                               (insert " ")
                                (insert-button
-                                "Copy URL"
+                                "URL"
                                 'face 'button
                                 'follow-link t
                                 'action (lambda (_) (kill-new (concat "https://youtube.com/watch?v=" id))))
+                               (insert " ")
+                               (insert-button
+                                "desc"
+                                'face 'button
+                                'follow-link t
+                                'action (lambda (_)
+                                          (inv/fetch-video-data
+                                           id
+                                           #'(lambda (data)
+                                               (let ((buf (get-buffer-create inv/viddesc-buffer-name))
+                                                     (desc (cdr (assoc 'description data))))
+                                                 (with-current-buffer buf
+                                                   (erase-buffer)
+                                                   (insert desc)
+                                                   (switch-to-buffer buf)))))))
                                (insert "\n")
                                (funcall f (cdr l)))))))
                        (t
