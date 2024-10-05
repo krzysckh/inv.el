@@ -180,7 +180,7 @@ interactively, `cb' defaults to `inv/display-channel'"
                        (funcall cb nil)))
              :complete (cl-function
                         (lambda (&key data &allow-other-keys)
-                          (let* ((data (string-as-unibyte data)))
+                          (when-let ((data (string-as-unibyte data)))
                             (image--set-property i :data data)
                             (image-refresh i)))))))))))
 
