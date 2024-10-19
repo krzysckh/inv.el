@@ -177,7 +177,7 @@ interactively, `cb' defaults to `inv/display-channel'"
              :encoding 'binary
              :error (cl-function
                      (lambda (&key data &allow-other-keys)
-                       (funcall cb nil)))
+                       (message "Couldn't load a thumbnail for %s" id-or-url)))
              :complete (cl-function
                         (lambda (&key data &allow-other-keys)
                           (when-let ((data (string-as-unibyte data)))
