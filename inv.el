@@ -1,11 +1,11 @@
 ;;; inv.el --- easy interaction with invidious instances -*- lexical-binding: t -*-
 
-;; Author: kpm <kpm@linux.pl>
+;; Author: kpm <kpm@krzysckh.org>
 ;; Created: 28 Aug 2024
 ;; Keywords: network, invidious, youtube
 ;; URL: https://github.com/krzysckh/inv.el
 ;;
-;; Copyright (C) 2024 kpm <kpm@linux.pl>
+;; Copyright (C) 2024 kpm <kpm@krzysckh.org>
 ;;
 ;; Redistribution and use in source and binary forms, with or without
 ;; modification, are permitted provided that the following conditions are
@@ -39,7 +39,7 @@
 (require 'json)
 (require 'url)
 
-(defvar inv/instances '("iv.ggtyler.dev" "inv.nadeko.net" "invidious.nerdvpn.de" "invidious.jing.rocks" "iv.nboeck.de" "invidious.perennialte.ch" "invidious.reallyaweso.me" "yewtu.be" "invidious.privacyredirect.com" "invidious.einfachzocken.eu"))
+(defvar inv/instances '("inv.nadeko.net" "invidious.jing.rocks" "yewtu.be" "yt.drgnz.club"))
 (defvar inv/request-timeout 3 "timeout for a `inv/json-request' (in seconds)")
 (defvar inv/thumbnail-quality 'sddefault "the thumbnail returned by `inv/fetch-thumbnail-url': one of maxres, sddefault, high, medium, default, start, middle, end.")
 (defvar inv/search-buffer-name "*Invidious search results*")
