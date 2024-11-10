@@ -47,6 +47,8 @@
 (defvar inv/chan-buffer-name "*Invidious channel videos*")
 (defvar inv/viddesc-buffer-name "*Invidious video description*")
 
+(defvar inv/display-additional-data nil "a function that may insert additional data per line for `inv//display-data'. gets passed an assoc list of values it may use")
+
 (defvar inv//thumb-cache nil)
 
 (defun inv//json-read-l (&rest r)
@@ -305,6 +307,9 @@ interactively, `cb' defaults to `inv/display-channel'"
                                                    (erase-buffer)
                                                    (insert desc)
                                                    (switch-to-buffer buf)))))))
+                               (when inv/display-additional-data
+                                 (insert " ")
+                                 (funcall inv/display-additional-data r))
                                (insert "\n")
                                (funcall f (cdr l)))))))
                        (t
