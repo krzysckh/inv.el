@@ -39,7 +39,7 @@
 (require 'json)
 (require 'url)
 
-(defvar inv/instances '("inv.nadeko.net" "invidious.jing.rocks" "yewtu.be" "yt.drgnz.club"))
+(defvar inv/instances '("inv.vern.cc"))
 (defvar inv/request-timeout 3 "timeout for a `inv/json-request' (in seconds)")
 (defvar inv/thumbnail-quality 'sddefault "the thumbnail returned by `inv/fetch-thumbnail-url': one of maxres, sddefault, high, medium, default, start, middle, end.")
 (defvar inv/search-buffer-name "*Invidious search results*")
