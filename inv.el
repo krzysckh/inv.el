@@ -51,6 +51,16 @@
 
 (defvar inv//thumb-cache nil)
 
+(defun inv/display-additional-data--ytmp4 (r)
+  "example handler for `inv/display-additional-data'"
+  (let ((id (cdr (assoc 'videoId r))))
+    (message "id: %s" id)
+    (insert-button
+     "ytmp4"
+     'face 'button
+     'action #'(lambda (_)
+                 (async-shell-command (concat "cd /tmp && ytmp4 https://youtube.com/watch?v=" id))))))
+
 (defun inv//json-read-l (&rest r)
   (let ((json-array-type 'list))
     (apply #'json-read r)))
@@ -140,6 +150,10 @@ interactively, `cb' defaults to `inv/display-channel'"
   (interactive
    (list (read-string "Enter chan id: ") #'inv/display-channel))
   (inv/json-request (concat "/api/v1/channels/" (url-encode-url id) "/videos") cb))
+
+(defun inv/channel-2 (id cb)
+  "get data about channel with id `id', pass them to `cb'"
+  (inv/json-request (concat "/api/v1/channels/" (url-encode-url id)) cb))
 
 (defun inv/fetch-video-data (id cb)
   (inv/json-request (concat "/api/v1/videos/" id) cb))
