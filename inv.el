@@ -54,7 +54,6 @@
 (defun inv/display-additional-data--ytmp4 (r)
   "example handler for `inv/display-additional-data'"
   (let ((id (cdr (assoc 'videoId r))))
-    (message "id: %s" id)
     (insert-button
      "ytmp4"
      'face 'button
@@ -95,7 +94,7 @@
 
 (defun inv/get-clearnet-instances (cb)
   "call `cb' with a list of clearnet invidious instances."
-  (inv/get-instances (lambda (l) (funcall cb (--filter (not (string-match "onion\\|i2p" it)) l)))))
+  (inv/get-instances (lambda (l &rest _) (funcall cb (--filter (not (string-match "onion\\|i2p" it)) l)))))
 
 (defun inv/json-request (to cb &rest opts)
   "invoke a request `to' to an invidious instance from `inv/instances'. if it fails, try another. call `cb' with the result."
@@ -114,7 +113,7 @@
                       :success (cl-function
                                  (lambda (&key data &allow-other-keys)
                                    (if (null (assoc 'error data))
-                                       (funcall cb data)
+                                       (funcall cb data (car l))
                                      (funcall f (cdr l)))))))))))
     (let ((l (inv//shuf (-copy inv/instances))))
       (funcall f l)))
@@ -124,7 +123,7 @@
   "download and invidious instances and set `inv/instances' to the result."
   (interactive)
   (inv/get-clearnet-instances
-   #'(lambda (l)
+   #'(lambda (l &rest _)
        (setq inv/instances l)
        (message "set inv/instances to %s" l))))
 
@@ -144,12 +143,17 @@ result. if called interactively, `cb' defaults to
    (list (read-string "Enter query (chan): ") #'inv/display-channels))
   (inv/json-request (concat "/api/v1/search?type=channel&q=" (url-encode-url q)) cb))
 
-(defun inv/channel (id cb)
+(defun inv//maybe-continuation (base continuation)
+  (if continuation
+      (format "%s?continuation=%s" base (url-encode-url continuation))
+    base))
+
+(cl-defun inv/channel (id cb &key continuation)
   "get videos of channel with id `id', pass them to `cb', when called
 interactively, `cb' defaults to `inv/display-channel'"
   (interactive
    (list (read-string "Enter chan id: ") #'inv/display-channel))
-  (inv/json-request (concat "/api/v1/channels/" (url-encode-url id) "/videos") cb))
+  (inv/json-request (concat "/api/v1/channels/" (url-encode-url id) (inv//maybe-continuation "/videos" continuation)) cb))
 
 (defun inv/channel-2 (id cb)
   "get data about channel with id `id', pass them to `cb'"
@@ -167,7 +171,7 @@ interactively, `cb' defaults to `inv/display-channel'"
 (defun inv/fetch-thumbnail-urls (id cb)
   (inv/fetch-video-data
    id
-   (lambda (data)
+   (lambda (data &rest _)
      (funcall cb (inv/parse-thumbnails data)))))
 
 (defun inv/urlp (s)
@@ -176,7 +180,7 @@ interactively, `cb' defaults to `inv/display-channel'"
 (defun inv/fetch-thumbnail-url (id cb)
   (if (inv/urlp id)
       (funcall cb id)
-    (inv/fetch-thumbnail-urls id (lambda (l) (funcall cb (cdr (assoc 'url (cdr (assoc inv/thumbnail-quality l)))))))))
+    (inv/fetch-thumbnail-urls id (lambda (l &rest _) (funcall cb (cdr (assoc 'url (cdr (assoc inv/thumbnail-quality l)))))))))
 
 (defun inv/thumbnail-to-image (id-or-url cb)
   "Call `cb' with the image thumbnail associated with the video of id `id-or-url'. This funcion caches images in `inv//thumb-cache'. If url provided, use it instead of fetching it by video id."
@@ -188,7 +192,7 @@ interactively, `cb' defaults to `inv/display-channel'"
         (funcall cb i)
         (inv/fetch-thumbnail-url
          id-or-url
-         (lambda (url)
+         (lambda (url &rest _)
            (request url
              :encoding 'binary
              :error (cl-function
@@ -200,11 +204,11 @@ interactively, `cb' defaults to `inv/display-channel'"
                             (image--set-property i :data data)
                             (image-refresh i)))))))))))
 
-(defun inv/popup-thumbnail (id)
+(defun inv/popup-thumbnail (id &rest _)
   (let ((buf (get-buffer-create "*Thumbnail preview*")))
     (inv/thumbnail-to-image
      id
-     (lambda (image)
+     (lambda (image &rest _)
        (with-current-buffer buf
          (erase-buffer)
          (insert-image image)
@@ -215,16 +219,23 @@ interactively, `cb' defaults to `inv/display-channel'"
          (if (= char ?q)
              (quit-window t)))))))
 
-(defun inv/display-search-results (data)
+(defun inv/display-search-results (data &rest _)
   (inv//display-data data inv/search-buffer-name))
 
-(defun inv/display-channel (data)
-  (inv//display-data (cdr (assoc 'videos data)) inv/chan-buffer-name))
+(defun inv/display-channel (data selected-instance &rest _)
+  (let ((inv/instances (list selected-instance)))
+    (inv//display-data
+     (cdr (assoc 'videos data))
+     inv/chan-buffer-name
+     :continue #'(lambda ()
+                   (inv/channel (cdr (assoc 'authorId (cadr (assoc 'videos data))))
+                                #'inv/display-channel
+                                :continuation (cdr (assoc 'continuation data)))))))
 
-;; TODO: maybe this should be combined with inv/display-data
-(defun inv/display-channels (data)
+;; TODO: maybe this should be combined with inv//display-data
+(defun inv/display-channels (data &rest _)
   (let ((buf (get-buffer-create inv/chanlist-buffer-name)))
-    (letrec ((f (lambda (l)
+    (letrec ((f (lambda (l &rest _)
                   (cond
                    ((null l)
                     (switch-to-buffer buf)
@@ -262,13 +273,26 @@ interactively, `cb' defaults to `inv/display-channel'"
         (erase-buffer))
       (funcall f data))))
 
-(defun inv//display-data (data bufn)
+(defun inv//maybe-display-continuation (buffer continuation-function cb)
+  (when continuation-function
+    (with-current-buffer buffer
+      (insert-button
+       "Load More"
+       'face 'button
+       'follow-link t
+       'action #'(lambda (&rest _) (funcall continuation-function)))))
+  (funcall cb))
+
+(cl-defun inv//display-data (data bufn &key continue)
   (let ((buf (get-buffer-create bufn)))
-    (letrec ((f (lambda (l)
+    (letrec ((f (lambda (l &rest _)
                   (cond
                    ((null l)
-                    (switch-to-buffer bufn)
-                    (goto-char (point-min)))
+                    (inv//maybe-display-continuation
+                     buf continue
+                     #'(lambda ()
+                         (switch-to-buffer bufn)
+                         (goto-char (point-min)))))
                    (t
                     (let* ((r (car l))
                            (type (cdr (assoc 'type r))))
@@ -282,7 +306,7 @@ interactively, `cb' defaults to `inv/display-channel'"
                               (views (cdr (assoc 'viewCountText r))))
                           (inv/thumbnail-to-image
                            thumbnail-url
-                           (lambda (img)
+                           (lambda (img &rest _)
                              (with-current-buffer buf
                                (insert-button
                                 "Watch"
@@ -314,7 +338,7 @@ interactively, `cb' defaults to `inv/display-channel'"
                                 'action (lambda (_)
                                           (inv/fetch-video-data
                                            id
-                                           #'(lambda (data)
+                                           #'(lambda (data &rest _)
                                                (let ((buf (get-buffer-create inv/viddesc-buffer-name))
                                                      (desc (cdr (assoc 'description data))))
                                                  (with-current-buffer buf
