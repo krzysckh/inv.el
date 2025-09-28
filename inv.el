@@ -33,6 +33,7 @@
 ;; This file is not part of GNU Emacs.
 
 ;;; Code:
+;;; Commentary:
 
 (require 'request)
 (require 'dash)
@@ -40,19 +41,19 @@
 (require 'url)
 
 (defvar inv/instances '("inv.vern.cc"))
-(defvar inv/request-timeout 3 "timeout for a `inv/json-request' (in seconds)")
-(defvar inv/thumbnail-quality 'sddefault "the thumbnail returned by `inv/fetch-thumbnail-url': one of maxres, sddefault, high, medium, default, start, middle, end.")
+(defvar inv/request-timeout 3 "Timeout for a `inv/json-request' (in seconds).")
+(defvar inv/thumbnail-quality 'sddefault "The thumbnail returned by `inv/fetch-thumbnail-url': one of maxres, sddefault, high, medium, default, start, middle, end.")
 (defvar inv/search-buffer-name "*Invidious search results*")
 (defvar inv/chanlist-buffer-name "*Invidious channel search results*")
 (defvar inv/chan-buffer-name "*Invidious channel videos*")
 (defvar inv/viddesc-buffer-name "*Invidious video description*")
 
-(defvar inv/display-additional-data nil "a function that may insert additional data per line for `inv//display-data'. gets passed an assoc list of values it may use")
+(defvar inv/display-additional-data nil "Function that may insert additional data per line for `inv//display-data'.  Gets passed an assoc list of values it may use.")
 
 (defvar inv//thumb-cache nil)
 
 (defun inv/display-additional-data--ytmp4 (r)
-  "example handler for `inv/display-additional-data'"
+  "Example handler for `inv/display-additional-data'."
   (let ((id (cdr (assoc 'videoId r))))
     (insert-button
      "ytmp4"
@@ -61,31 +62,35 @@
                  (async-shell-command (concat "cd /tmp && ytmp4 https://youtube.com/watch?v=" id))))))
 
 (defun inv//json-read-l (&rest r)
+  "Read json R with array-type list."
   (let ((json-array-type 'list))
     (apply #'json-read r)))
 
 (defun inv//shuf (seq)
+  "Shuffle elements of SEQ."
   (let ((n (length seq)))
     (prog1 seq
       (dotimes (i n)
         (cl-rotatef (elt seq i) (elt seq (+ i (cl-random (- n i)))))))))
 
 (defun inv/videop (url)
-  "check if `url' is a video, if so return the id, elsewise nil"
+  "Check if URL is a video, if so return the id, elsewise nil."
   (if (string-match "watch\\?v=\\(.*\\)" (or url ""))
       (match-string 1 url)
     nil))
 
 (defun inv/id-at-point ()
+  "Return YouTube ID of the url at point."
   (let ((url (thing-at-point 'url)))
     (inv/videop url)))
 
 (defun inv/clear-thumbnail-cache ()
+  "Clear thumbnail cache."
   (interactive)
   (setq inv//thumb-cache nil))
 
 (defun inv/get-instances (cb)
-  "call `cb' with a list of invidious instances."
+  "Call CB with a list of invidious instances."
   (request "https://api.invidious.io/instances.json"
     :parser #'inv//json-read-l
     :complete (cl-function (lambda (&key data &allow-other-keys)
@@ -93,11 +98,11 @@
   t)
 
 (defun inv/get-clearnet-instances (cb)
-  "call `cb' with a list of clearnet invidious instances."
+  "Call CB with a list of clearnet invidious instances."
   (inv/get-instances (lambda (l &rest _) (funcall cb (--filter (not (string-match "onion\\|i2p" it)) l)))))
 
 (defun inv/json-request (to cb &rest opts)
-  "invoke a request `to' to an invidious instance from `inv/instances'. if it fails, try another. call `cb' with the result."
+  "Invoke a request TO to an invidious instance from `inv/instances'.  If it fails, try another.  Calls CB with the result.  Use OPTS as options for request."
   (letrec ((f (lambda (l)
                 (message "inv/json-request: trying %s..." (car l))
                 (if (null l)
@@ -120,7 +125,7 @@
   t)
 
 (defun inv/load-instances ()
-  "download and invidious instances and set `inv/instances' to the result."
+  "Download invidious instances and set `inv/instances' to the result."
   (interactive)
   (inv/get-clearnet-instances
    #'(lambda (l &rest _)
@@ -128,17 +133,13 @@
        (message "set inv/instances to %s" l))))
 
 (defun inv/search (q cb)
-  "search for `q' on one of `inv/instances'. call `cb' with the
-result. if called interactivaly, `cb' defaults to
-`inv/display-search-results'"
+  "Search for Q on one of `inv/instances'.  Call CB with the result.  If called interactivaly, CB defaults to `inv/display-search-results'."
   (interactive
    (list (read-string "Enter query: ") #'inv/display-search-results))
   (inv/json-request (concat "/api/v1/search?q=" (url-encode-url q)) cb))
 
 (defun inv/search-channel (q cb)
-  "search for channel `q' on one of `inv/instances'. call `cb with the
-result. if called interactively, `cb' defaults to
-`inv/display-channels'."
+  "Search for channel Q on one of `inv/instances'.  Call CB with the result.  If called interactively, CB defaults to `inv/display-channels'."
   (interactive
    (list (read-string "Enter query (chan): ") #'inv/display-channels))
   (inv/json-request (concat "/api/v1/search?type=channel&q=" (url-encode-url q)) cb))
@@ -149,41 +150,45 @@ result. if called interactively, `cb' defaults to
     base))
 
 (cl-defun inv/channel (id cb &key continuation)
-  "get videos of channel with id `id', pass them to `cb', when called
-interactively, `cb' defaults to `inv/display-channel'"
+  "Get videos of channel with id ID, pass them to CB, when called interactively, CB defaults to `inv/display-channel'.  Continuation via CONTINUATION."
   (interactive
    (list (read-string "Enter chan id: ") #'inv/display-channel))
   (inv/json-request (concat "/api/v1/channels/" (url-encode-url id) (inv//maybe-continuation "/videos" continuation)) cb))
 
 (defun inv/channel-2 (id cb)
-  "get data about channel with id `id', pass them to `cb'"
+  "Get data about channel with id ID, pass them to CB."
   (inv/json-request (concat "/api/v1/channels/" (url-encode-url id)) cb))
 
 (defun inv/fetch-video-data (id cb)
+  "Fetch data of video with id ID, pass data to CB."
   (inv/json-request (concat "/api/v1/videos/" id) cb))
 
 (defun inv/parse-thumbnails (exp)
+  "Parse out thumbnails from EXP."
   (--map
    (let ((name (cdr (assoc "quality" it #'string=))))
      (append (list (intern name)) (--filter (not (string= (car it) "quality")) it)))
    (cdr (assoc 'videoThumbnails exp))))
 
 (defun inv/fetch-thumbnail-urls (id cb)
+  "Fetch thumbnail urls from video with id ID.  Pass data to CB."
   (inv/fetch-video-data
    id
    (lambda (data &rest _)
      (funcall cb (inv/parse-thumbnails data)))))
 
 (defun inv/urlp (s)
+  "Check whether S is a url."
   (string-match "^http" s))
 
 (defun inv/fetch-thumbnail-url (id cb)
+  "Fetch thumbnail url of video with id ID.  Pass data to CB."
   (if (inv/urlp id)
       (funcall cb id)
     (inv/fetch-thumbnail-urls id (lambda (l &rest _) (funcall cb (cdr (assoc 'url (cdr (assoc inv/thumbnail-quality l)))))))))
 
 (defun inv/thumbnail-to-image (id-or-url cb)
-  "Call `cb' with the image thumbnail associated with the video of id `id-or-url'. This funcion caches images in `inv//thumb-cache'. If url provided, use it instead of fetching it by video id."
+  "Call CB with the image thumbnail associated with the video of id ID-OR-URL.  This funcion caches images in `inv//thumb-cache'.  If url provided, use it instead of fetching it by video id."
   (let ((c (assoc id-or-url inv//thumb-cache #'string=)))
     (if c
         (funcall cb (cdr c))
@@ -205,6 +210,7 @@ interactively, `cb' defaults to `inv/display-channel'"
                             (image-refresh i)))))))))))
 
 (defun inv/popup-thumbnail (id &rest _)
+  "Create a popup with thumbnail for video with id ID."
   (let ((buf (get-buffer-create "*Thumbnail preview*")))
     (inv/thumbnail-to-image
      id
@@ -220,9 +226,11 @@ interactively, `cb' defaults to `inv/display-channel'"
              (quit-window t)))))))
 
 (defun inv/display-search-results (data &rest _)
+  "Interactively display search results for DATA."
   (inv//display-data data inv/search-buffer-name))
 
 (defun inv/display-channel (data selected-instance &rest _)
+  "Interactively display channel for DATA in SELECTED-INSTANCE."
   (let ((inv/instances (list selected-instance)))
     (inv//display-data
      (cdr (assoc 'videos data))
@@ -234,6 +242,7 @@ interactively, `cb' defaults to `inv/display-channel'"
 
 ;; TODO: maybe this should be combined with inv//display-data
 (defun inv/display-channels (data &rest _)
+  "Interactively display channels for DATA."
   (let ((buf (get-buffer-create inv/chanlist-buffer-name)))
     (letrec ((f (lambda (l &rest _)
                   (cond
@@ -284,6 +293,7 @@ interactively, `cb' defaults to `inv/display-channel'"
   (funcall cb))
 
 (cl-defun inv//display-data (data bufn &key continue)
+  "Interactively display DATA with in buffer named BUFN.  Allow continuing with CONTINUE."
   (let ((buf (get-buffer-create bufn)))
     (letrec ((f (lambda (l &rest _)
                   (cond
@@ -358,7 +368,7 @@ interactively, `cb' defaults to `inv/display-channel'"
 
 ;; does not call an invidious instance, but a nice thing to have
 (defun inv/dislikes (id cb)
-  "ask the return youtube dislike api for stats on video with id `id', pass that data to `cb'"
+  "Ask the return youtube dislike api for stats on video with id ID, pass that data to CB."
   (request (concat "https://returnyoutubedislikeapi.com/votes?videoId=" id)
     :parser #'inv//json-read-l
     :success (cl-function
@@ -367,3 +377,4 @@ interactively, `cb' defaults to `inv/display-channel'"
   t)
 
 (provide 'inv)
+;;; inv.el ends here.
