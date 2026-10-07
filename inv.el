@@ -40,7 +40,9 @@
 (require 'json)
 (require 'url)
 
-(defvar inv/instances '("inv.vern.cc"))
+(defvar inv/instances '("inv.vern.cc")
+  "List of known invidious instances to query for data.
+Use M-x inv/load-instances to populate this list with more up-to-date, known hostnames.")
 (defvar inv/request-timeout 3 "Timeout for a `inv/json-request' (in seconds).")
 (defvar inv/thumbnail-quality 'sddefault "The thumbnail returned by `inv/fetch-thumbnail-url': one of maxres, sddefault, high, medium, default, start, middle, end.")
 (defvar inv/search-buffer-name "*Invidious search results*")
